@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Overflow is deliberately NOT sandboxed: it enumerates other apps'
+	  status-item windows (CGWindowList), captures their pixels
+	  (ScreenCaptureKit, gated by the Screen Recording TCC consent), and
+	  posts synthetic clicks (CGEvent, gated by the Accessibility TCC
+	  consent). None of that works from inside the sandbox.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>
