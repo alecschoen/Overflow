@@ -22,12 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
     private var statusBar: StatusBarController!
     private let popout = PopoutController()
     private lazy var onboarding = OnboardingWindowController()
-    private lazy var settings = SettingsWindowController()
+    private let settings = SettingsPanelController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
         statusBar.delegate = self
         popout.statusBar = statusBar
+        settings.openSetupGuide = { [weak self] in self?.onboarding.show() }
 
         // Warm the icon cache once the bar has settled: off-screen windows
         // can't be captured on macOS 26, so snapshot icons while visible.
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
     // MARK: StatusBarDelegate
 
     func chevronLeftClicked(_ button: NSStatusBarButton) {
+        settings.close()
         if statusBar.isCollapsed {
             popout.toggle(relativeTo: button)
         } else {
@@ -95,7 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
     }
 
     @objc private func showSettings() {
-        settings.show()
+        popout.close()
+        settings.open(relativeTo: statusBar.chevronItem.button)
     }
 
     @objc private func refreshIcons() {
