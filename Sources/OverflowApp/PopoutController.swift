@@ -91,8 +91,35 @@ final class PopoutController: ObservableObject {
         flashRefreshCache(onlyIfMissing: true)
     }
 
+    /// Stashed items with per-Space duplicates collapsed.
+    ///
+    /// Every Space (desktop / fullscreen app) has its own window copy of
+    /// each status item, all at the same coordinates. Distinct items never
+    /// overlap, so overlapping frames = the same item seen through several
+    /// Spaces. Keep one copy per item, preferring the one we have a captured
+    /// image for (that's the copy from the Space it was photographed on).
+    private func dedupedHiddenItems() -> [MenuBarItemInfo] {
+        let hidden = MenuBarScanner.hiddenItems(on: targetDisplay) // sorted by minX
+        var result: [MenuBarItemInfo] = []
+        for item in hidden {
+            if let last = result.last, overlapsSubstantially(last.frame, item.frame) {
+                if cachedImages[item.windowID] != nil && cachedImages[last.windowID] == nil {
+                    result[result.count - 1] = item
+                }
+            } else {
+                result.append(item)
+            }
+        }
+        return result
+    }
+
+    private func overlapsSubstantially(_ a: CGRect, _ b: CGRect) -> Bool {
+        let intersection = a.intersection(b)
+        return intersection.width > min(a.width, b.width) * 0.5
+    }
+
     func refresh() {
-        let hidden = MenuBarScanner.hiddenItems(on: targetDisplay)
+        let hidden = dedupedHiddenItems()
         items = hidden.map { info in
             PopoutItem(
                 info: info,
@@ -112,7 +139,7 @@ final class PopoutController: ObservableObject {
     func flashRefreshCache(onlyIfMissing: Bool) {
         guard !flashInProgress, Permissions.screenRecording else { return }
         if onlyIfMissing {
-            let hidden = MenuBarScanner.hiddenItems(on: targetDisplay)
+            let hidden = dedupedHiddenItems()
             guard hidden.contains(where: { cachedImages[$0.windowID] == nil }) else { return }
             // Don't strobe the bar if some window persistently fails to capture.
             if let last = lastAutoFlash, Date().timeIntervalSince(last) < 30 { return }
