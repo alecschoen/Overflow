@@ -59,6 +59,10 @@ final class PopoutController: ObservableObject {
             // Fallback: hang off the top-right of the main screen.
             anchor = NSPoint(x: screen.visibleFrame.maxX - 8, y: screen.visibleFrame.maxY - 4)
         }
+        // Layer colors don't track appearance changes — re-resolve on open.
+        if let effect = panel.contentView as? NSVisualEffectView {
+            effect.layer?.borderColor = NSColor.separatorColor.cgColor
+        }
         refresh()
         layoutPanel()
         panel.orderFrontRegardless()
@@ -186,13 +190,17 @@ final class PopoutController: ObservableObject {
         if let panel { return panel }
 
         let hosting = NSHostingView(rootView: PopoutView(controller: self))
+        // Same frosted glass as a system menu-bar-extra window (what
+        // DisplayVolume's popup uses): opaque popover material, 16pt
+        // corners, hairline border.
         let effect = NSVisualEffectView()
-        effect.material = .menu
+        effect.material = .popover
         effect.state = .active
         effect.blendingMode = .behindWindow
         effect.wantsLayer = true
-        effect.layer?.cornerRadius = 12
+        effect.layer?.cornerRadius = 16
         effect.layer?.masksToBounds = true
+        effect.layer?.borderWidth = 1
         effect.addSubview(hosting)
         hosting.autoresizingMask = [.width, .height]
         hosting.frame = effect.bounds
