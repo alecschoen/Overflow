@@ -6,7 +6,7 @@ Stash the icons you rarely need behind a chevron. Click it and they appear
 in a popout tray under the menu bar — click one there and it works exactly
 as if it were still in the bar.
 
-![The Overflow tray — stashed icons in a frosted grid](screenshots/tray.png)
+![The Overflow tray open under the menu bar chevron](screenshots/tray.png)
 
 ## Why
 
@@ -24,8 +24,11 @@ Windows system tray has done forever.
 
   *(shown inline-expanded — everything left of the `|` gets stashed)*
 
-- **Open the tray**: click the `v` chevron. Stashed icons show up at their
-  real size, in rows. Click any icon — left or right click — and Overflow
+- **Open the tray**: click the `v` chevron.
+
+  ![Menu bar at rest with the v chevron](screenshots/menubar-rest.png)
+
+  Stashed icons show up at their real size, in rows. Click any icon — left or right click — and Overflow
   forwards the click to the real item: it briefly slides back into the bar,
   its menu opens right where you'd expect, and it re-stashes automatically
   when the menu closes.
