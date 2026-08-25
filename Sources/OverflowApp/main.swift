@@ -21,14 +21,17 @@ enum LaunchAtLogin {
 final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
     private var statusBar: StatusBarController!
     private let popout = PopoutController()
-    private lazy var onboarding = OnboardingWindowController()
-    private let settings = SettingsPanelController()
+    private lazy var onboarding: AnchoredPanel<OnboardingView> = AnchoredPanel { [weak self] in
+        OnboardingView(done: { self?.onboarding.close() })
+    }
+    private lazy var settings: AnchoredPanel<SettingsPanelView> = AnchoredPanel { [weak self] in
+        SettingsPanelView(openSetupGuide: { self?.showOnboarding() })
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
         statusBar.delegate = self
         popout.statusBar = statusBar
-        settings.openSetupGuide = { [weak self] in self?.onboarding.show() }
 
         // Warm the icon cache once the bar has settled: off-screen windows
         // can't be captured on macOS 26, so snapshot icons while visible.
@@ -38,12 +41,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
 
         if !UserDefaults.standard.bool(forKey: "didOnboard") {
             UserDefaults.standard.set(true, forKey: "didOnboard")
-            onboarding.show()
+            // Give the status items a beat to land in the bar first.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.showOnboarding()
+            }
         }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        onboarding.show()
+        showOnboarding()
         return false
     }
 
@@ -51,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
 
     func chevronLeftClicked(_ button: NSStatusBarButton) {
         settings.close()
+        onboarding.close()
         if statusBar.isCollapsed {
             popout.toggle(relativeTo: button)
         } else {
@@ -98,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
 
     @objc private func showSettings() {
         popout.close()
+        onboarding.close()
         settings.open(relativeTo: statusBar.chevronItem.button)
     }
 
@@ -106,7 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, StatusBarDelegate {
     }
 
     @objc private func showOnboarding() {
-        onboarding.show()
+        popout.close()
+        settings.close()
+        onboarding.open(relativeTo: statusBar.chevronItem.button)
     }
 }
 
