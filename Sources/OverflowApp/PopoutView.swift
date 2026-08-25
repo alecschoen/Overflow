@@ -99,6 +99,7 @@ private struct ItemCell: View {
     let item: PopoutItem
     let action: (Bool) -> Void
     @State private var hovering = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         iconView
@@ -118,11 +119,13 @@ private struct ItemCell: View {
         if let icon = item.icon {
             // Template glyphs are re-tinted to the tray's own appearance so
             // they stay readable whatever color the menu bar drew them in.
+            // Pure white / pure black — the same colors the menu bar itself
+            // draws template glyphs in (label colors are slightly dimmed).
             Image(nsImage: icon.image)
                 .renderingMode(icon.isTemplate ? .template : .original)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .foregroundStyle(.primary)
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                 .frame(width: min(item.info.frame.width, 200), height: item.info.frame.height)
         } else if let fallback = item.fallback {
             Image(nsImage: fallback)
