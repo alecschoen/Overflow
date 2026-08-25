@@ -198,6 +198,7 @@ final class PopoutController: ObservableObject {
         effect.state = .active
         effect.blendingMode = .behindWindow
         effect.wantsLayer = true
+        effect.maskImage = PanelChrome.roundedCornerMask(radius: 16)
         effect.layer?.cornerRadius = 16
         effect.layer?.masksToBounds = true
         effect.layer?.borderWidth = 1
