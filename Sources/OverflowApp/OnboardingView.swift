@@ -1,52 +1,40 @@
 import SwiftUI
 import AppKit
 
-@MainActor
-final class OnboardingWindowController: NSWindowController {
-    convenience init() {
-        let hosting = NSHostingController(rootView: OnboardingView())
-        let window = NSWindow(contentViewController: hosting)
-        window.title = "Welcome to Overflow"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        self.init(window: window)
-    }
-
-    func show() {
-        window?.center()
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
-    }
-}
-
+/// The setup guide, shown in a frosted anchored panel (same chrome as the
+/// tray and settings): quick-start steps plus permission status.
 struct OnboardingView: View {
+    let done: () -> Void
+
     @State private var screenGranted = Permissions.screenRecording
     @State private var axGranted = Permissions.accessibility
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Overflow").font(.title.bold())
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Welcome to Overflow")
+                    .font(.headline)
                 Text("A Windows-style overflow tray for your menu bar icons.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                step("1", "Hold ⌘ and drag menu bar icons to the **left** of the ❮ divider. They get stashed off the menu bar.")
-                step("2", "Click the ❮ chevron to open the tray with your stashed icons. Click an icon to use it — left and right clicks both work.")
+            VStack(alignment: .leading, spacing: 8) {
+                step("1", "Hold ⌘ and drag menu bar icons to the **left** of the | divider — they get stashed off the menu bar.")
+                step("2", "Click the v chevron to open the tray. Click an icon there to use it — left and right clicks both work.")
                 step("3", "Option-click the chevron to temporarily show everything inline.")
             }
 
             Divider()
 
-            Text("Permissions (both optional, both recommended)")
-                .font(.headline)
+            Text("Permissions (optional, recommended)")
+                .font(.caption.bold())
 
             permissionRow(
                 title: "Screen Recording",
-                detail: "Draws the real, live icons in the tray. Without it you'll see app icons instead. macOS may ask you to relaunch Overflow after granting.",
-                granted: screenGranted
+                granted: screenGranted,
+                detail: "Draws the real icons in the tray — relaunch Overflow after granting"
             ) {
                 Permissions.requestScreenRecording()
                 Permissions.openScreenRecordingSettings()
@@ -54,23 +42,24 @@ struct OnboardingView: View {
 
             permissionRow(
                 title: "Accessibility",
-                detail: "Forwards your tray clicks to the real icons. Without it, clicking a tray icon just reveals the menu bar icons for a few seconds.",
-                granted: axGranted
+                granted: axGranted,
+                detail: "Forwards tray clicks to the real items"
             ) {
                 Permissions.requestAccessibility()
                 Permissions.openAccessibilitySettings()
             }
 
+            Divider()
+
             HStack {
                 Spacer()
-                Button("Done") {
-                    NSApp.keyWindow?.close()
-                }
-                .keyboardShortcut(.defaultAction)
+                Button("Done") { done() }
+                    .controlSize(.small)
+                    .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(24)
-        .frame(width: 480)
+        .padding(12)
+        .frame(width: 340)
         .onReceive(timer) { _ in
             screenGranted = Permissions.screenRecording
             axGranted = Permissions.accessibility
@@ -78,32 +67,33 @@ struct OnboardingView: View {
     }
 
     private func step(_ number: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             Text(number)
-                .font(.callout.bold())
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.accentColor.opacity(0.18)))
+                .font(.caption.bold())
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(Color.accentColor.opacity(0.2)))
             Text(.init(text))
+                .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func permissionRow(title: String, detail: String, granted: Bool, grant: @escaping () -> Void) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: granted ? "checkmark.circle.fill" : "circle.dashed")
+    @ViewBuilder
+    private func permissionRow(title: String, granted: Bool, detail: String, open: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: granted ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(granted ? Color.green : Color.secondary)
-                .font(.system(size: 18))
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.callout.bold())
-                Text(detail)
-                    .font(.caption)
+                .font(.caption)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.caption)
+                Text(granted ? "Granted" : detail)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if !granted {
-                Button("Grant…", action: grant)
+                Button("Open Settings") { open() }
                     .controlSize(.small)
             }
         }
