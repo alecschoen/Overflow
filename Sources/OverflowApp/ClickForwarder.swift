@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 /// Forwards a click from the tray popout to the real status item: slides the
 /// stashed icons back on-screen, posts a synthetic click at the item's
@@ -44,7 +45,21 @@ final class ClickForwarder {
         }
 
         let windowsBefore = Self.onScreenWindowIDs()
-        Self.postClick(at: CGPoint(x: frame.midX, y: frame.midY), right: rightClick)
+        let point = CGPoint(x: frame.midX, y: frame.midY)
+        if Self.isUnderNotch(frame) {
+            // A synthetic click at notch coordinates hits nothing. Activate
+            // the item through its accessibility element instead — AXPress
+            // works regardless of physical visibility. AX calls can block
+            // while the opened menu tracks, so run off the main thread.
+            let pids = Self.candidatePIDs()
+            Task.detached {
+                if !Self.axActivate(near: point, rightClick: rightClick, pids: pids) {
+                    Self.postClick(at: point, right: rightClick)
+                }
+            }
+        } else {
+            Self.postClick(at: point, right: rightClick)
+        }
         watcher = RecollapseWatcher(initialWindows: windowsBefore) { [weak statusBar] in
             statusBar?.releaseExpansion()
         }
@@ -87,8 +102,91 @@ final class ClickForwarder {
         return result
     }
 
+    /// True when the frame overlaps a notch — the strip of menu bar where no
+    /// pixels exist and no synthetic click can land.
+    static func isUnderNotch(_ frame: CGRect) -> Bool {
+        guard let primary = NSScreen.screens.first else { return false }
+        for screen in NSScreen.screens {
+            guard screen.safeAreaInsets.top > 0,
+                  let left = screen.auxiliaryTopLeftArea,
+                  let right = screen.auxiliaryTopRightArea else { continue }
+            // AppKit and CG global coordinates share the x axis; flip y.
+            let cgTop = primary.frame.maxY - screen.frame.maxY
+            guard abs(frame.minY - cgTop) < 44 else { continue }
+            if frame.maxX > left.maxX && frame.minX < right.minX { return true }
+        }
+        return false
+    }
+
+    /// Running apps most likely to own a status item first.
+    static func candidatePIDs() -> [pid_t] {
+        NSWorkspace.shared.runningApplications
+            .filter { $0.processIdentifier > 0 }
+            .sorted { rank($0) < rank($1) }
+            .map(\.processIdentifier)
+    }
+
+    private static func rank(_ app: NSRunningApplication) -> Int {
+        switch app.activationPolicy {
+        case .accessory: return 0   // menu-bar-only apps
+        case .regular: return 1
+        case .prohibited: return 2
+        @unknown default: return 3
+        }
+    }
+
+    /// Finds the status-item accessibility element at `point` (searching
+    /// every app's AXExtrasMenuBar) and performs AXPress / AXShowMenu on it.
+    /// Blocking — call off the main thread.
+    nonisolated static func axActivate(near point: CGPoint, rightClick: Bool, pids: [pid_t]) -> Bool {
+        for pid in pids {
+            let axApp = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(axApp, 0.25)
+            var extrasRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(axApp, "AXExtrasMenuBar" as CFString, &extrasRef) == .success,
+                  let extras = extrasRef, CFGetTypeID(extras) == AXUIElementGetTypeID()
+            else { continue }
+            let bar = extras as! AXUIElement
+            var childrenRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(bar, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+                  let children = childrenRef as? [AnyObject]
+            else { continue }
+            for childAny in children {
+                guard CFGetTypeID(childAny) == AXUIElementGetTypeID() else { continue }
+                let child = childAny as! AXUIElement
+                guard let frame = axFrame(child), frame.insetBy(dx: -4, dy: -4).contains(point) else { continue }
+                var action = kAXPressAction as String
+                if rightClick, axSupports(child, action: "AXShowMenu") { action = "AXShowMenu" }
+                return AXUIElementPerformAction(child, action as CFString) == .success
+            }
+        }
+        return false
+    }
+
+    private nonisolated static func axFrame(_ element: AXUIElement) -> CGRect? {
+        var posRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef) == .success,
+              let posValue = posRef, CFGetTypeID(posValue) == AXValueGetTypeID(),
+              let sizeValue = sizeRef, CFGetTypeID(sizeValue) == AXValueGetTypeID()
+        else { return nil }
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        AXValueGetValue(posValue as! AXValue, .cgPoint, &position)
+        AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+        return CGRect(origin: position, size: size)   // AX uses CG global coordinates
+    }
+
+    private nonisolated static func axSupports(_ element: AXUIElement, action: String) -> Bool {
+        var namesRef: CFArray?
+        guard AXUIElementCopyActionNames(element, &namesRef) == .success,
+              let names = namesRef as? [String] else { return false }
+        return names.contains(action)
+    }
+
     /// Posts a synthetic click in global CG coordinates (needs Accessibility).
-    static func postClick(at point: CGPoint, right: Bool) {
+    nonisolated static func postClick(at point: CGPoint, right: Bool) {
         let source = CGEventSource(stateID: .hidSystemState)
         let button: CGMouseButton = right ? .right : .left
         guard let down = CGEvent(mouseEventSource: source,
@@ -145,7 +243,9 @@ final class RecollapseWatcher {
         if sawUI {
             let stillOpen = !current.isDisjoint(with: openedWindows)
             if !stillOpen || elapsed > 90 { finish() }
-        } else if elapsed > 2.5 {
+        } else if elapsed > 4.0 {
+            // (Generous: the AX fallback path can take a moment to search
+            // every app's menu bar extras before the menu appears.)
             // The click did something without opening UI (or toggled an
             // existing window) — safe to re-stash.
             finish()
