@@ -46,19 +46,16 @@ final class ClickForwarder {
 
         let windowsBefore = Self.onScreenWindowIDs()
         let point = CGPoint(x: frame.midX, y: frame.midY)
-        if Self.isUnderNotch(frame) {
-            // A synthetic click at notch coordinates hits nothing. Activate
-            // the item through its accessibility element instead — AXPress
-            // works regardless of physical visibility. AX calls can block
-            // while the opened menu tracks, so run off the main thread.
-            let pids = Self.candidatePIDs()
-            Task.detached {
-                if !Self.axActivate(near: point, rightClick: rightClick, pids: pids) {
-                    Self.postClick(at: point, right: rightClick)
-                }
+        // Activate through the item's accessibility element — one consistent
+        // path for every item, and the only one that works behind the notch,
+        // where synthetic clicks land on nothing. Falls back to a coordinate
+        // click if no AX element matches. AX calls can block while the
+        // opened menu tracks, so run off the main thread.
+        let pids = Self.candidatePIDs()
+        Task.detached {
+            if !Self.axActivate(near: point, rightClick: rightClick, pids: pids) {
+                Self.postClick(at: point, right: rightClick)
             }
-        } else {
-            Self.postClick(at: point, right: rightClick)
         }
         watcher = RecollapseWatcher(initialWindows: windowsBefore) { [weak statusBar] in
             statusBar?.releaseExpansion()
@@ -120,22 +117,6 @@ final class ClickForwarder {
             result.append(frame)
         }
         return result
-    }
-
-    /// True when the frame overlaps a notch — the strip of menu bar where no
-    /// pixels exist and no synthetic click can land.
-    static func isUnderNotch(_ frame: CGRect) -> Bool {
-        guard let primary = NSScreen.screens.first else { return false }
-        for screen in NSScreen.screens {
-            guard screen.safeAreaInsets.top > 0,
-                  let left = screen.auxiliaryTopLeftArea,
-                  let right = screen.auxiliaryTopRightArea else { continue }
-            // AppKit and CG global coordinates share the x axis; flip y.
-            let cgTop = primary.frame.maxY - screen.frame.maxY
-            guard abs(frame.minY - cgTop) < 44 else { continue }
-            if frame.maxX > left.maxX && frame.minX < right.minX { return true }
-        }
-        return false
     }
 
     /// Running apps most likely to own a status item first.
