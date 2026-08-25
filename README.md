@@ -1,12 +1,20 @@
-# Overflow
+<p align="center">
+  <img src="screenshots/icon.png" width="128" alt="Overflow icon">
+</p>
 
+<h1 align="center">Overflow</h1>
+
+<p align="center">
 A Windows-style overflow tray for macOS menu bar icons.
+</p>
+
+<p align="center">
+  <img src="screenshots/tray.png" width="600" alt="The Overflow tray open under the menu bar chevron">
+</p>
 
 Stash the icons you rarely need behind a chevron. Click it and they appear
 in a popout tray under the menu bar — click one there and it works exactly
 as if it were still in the bar.
-
-![The Overflow tray open under the menu bar chevron](screenshots/tray.png)
 
 ## Why
 
