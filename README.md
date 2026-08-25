@@ -18,9 +18,11 @@ Windows system tray has done forever.
 ## How it works
 
 - **Stash icons**: hold ⌘ and drag menu bar icons to the **left** of the
-  thin `❮` divider. They're pushed off the menu bar.
+  thin `|` divider. They're pushed off the menu bar.
 
-  ![Menu bar with the divider and chevron](screenshots/menubar.png)
+  ![Menu bar shown inline-expanded, with the divider and chevron](screenshots/menubar.png)
+
+  *(shown inline-expanded — everything left of the `|` gets stashed)*
 
 - **Open the tray**: click the `v` chevron. Stashed icons show up at their
   real size, in rows. Click any icon — left or right click — and Overflow
@@ -46,6 +48,8 @@ Both optional, both recommended — the app degrades gracefully without them:
 - **Accessibility** — used to forward tray clicks to the real items via
   synthetic mouse events. Without it, clicking a tray icon just reveals the
   menu bar icons for 8 seconds so you can click the real one.
+
+![Onboarding window with setup steps and permission status](screenshots/onboarding.png)
 
 ## Building
 
