@@ -80,11 +80,13 @@ final class ClickForwarder {
         return result
     }
 
-    /// On-screen windows that look like transient UI a status-item click
-    /// could have opened: menus, popovers, floating panels. On macOS 26 the
-    /// clicked item's window is owned by Control Centre, not the real app,
-    /// so ownership can't be used — watch globally instead.
-    static func onScreenTransientWindowIDs() -> Set<CGWindowID> {
+    /// On-screen windows that could be UI a status-item click opened: any
+    /// window at all — menus, popovers, floating panels, and plain
+    /// normal-level panels (ChatGPT, DockDoor). On macOS 26 the clicked
+    /// item's window is owned by Control Centre, not the real app, so
+    /// ownership can't identify the opener — watch globally and diff
+    /// against a before-click snapshot instead.
+    static func onScreenUIWindowIDs() -> Set<CGWindowID> {
         guard let raw = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
@@ -94,10 +96,28 @@ final class ClickForwarder {
             guard let number = info[kCGWindowNumber as String] as? Int,
                   let layer = info[kCGWindowLayer as String] as? Int,
                   let pid = info[kCGWindowOwnerPID as String] as? Int, Int32(pid) != myPID,
-                  (1...1000).contains(layer), layer != 24, layer != 25
+                  (0...1000).contains(layer), layer != 24, layer != 25
             else { continue }
             if let owner = info[kCGWindowOwnerName as String] as? String, owner == "Window Server" { continue }
             result.insert(CGWindowID(number))
+        }
+        return result
+    }
+
+    /// Current frames (CG coordinates) of the given on-screen windows.
+    static func frames(of windowIDs: Set<CGWindowID>) -> [CGRect] {
+        guard !windowIDs.isEmpty,
+              let raw = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        var result: [CGRect] = []
+        for info in raw {
+            guard let number = info[kCGWindowNumber as String] as? Int,
+                  windowIDs.contains(CGWindowID(number)),
+                  let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: boundsDict)
+            else { continue }
+            result.append(frame)
         }
         return result
     }
@@ -214,6 +234,7 @@ final class RecollapseWatcher {
     private let onDone: () -> Void
     private let start = Date()
     private var timer: Timer?
+    private var clickMonitor: Any?
     private var openedWindows = Set<CGWindowID>()
     private var sawUI = false
     private var completed = false
@@ -223,6 +244,26 @@ final class RecollapseWatcher {
         self.onDone = onDone
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
+        }
+        // Clicks inside the UI the forwarded click opened keep the bar
+        // revealed (panels like ChatGPT's are anchored to the item and die
+        // if it re-stashes under them); any click elsewhere re-stashes —
+        // that same click dismisses the panel anyway.
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.handleGlobalClick() }
+        }
+    }
+
+    private func handleGlobalClick() {
+        guard !completed, sawUI else { return }
+        let location = NSEvent.mouseLocation
+        guard let primary = NSScreen.screens.first else { return }
+        let cgPoint = CGPoint(x: location.x, y: primary.frame.maxY - location.y)
+        let frames = ClickForwarder.frames(of: openedWindows)
+        guard !frames.contains(where: { $0.contains(cgPoint) }) else { return }
+        // Give the click a beat to land before the bar re-layouts.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.finish()
         }
     }
 
@@ -234,7 +275,7 @@ final class RecollapseWatcher {
 
     private func tick() {
         let elapsed = Date().timeIntervalSince(start)
-        let current = ClickForwarder.onScreenTransientWindowIDs()
+        let current = ClickForwarder.onScreenUIWindowIDs()
         let newWindows = current.subtracting(initialWindows)
         if !newWindows.isEmpty {
             sawUI = true
@@ -257,6 +298,10 @@ final class RecollapseWatcher {
         completed = true
         timer?.invalidate()
         timer = nil
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
         onDone()
     }
 }
