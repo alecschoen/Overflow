@@ -1,6 +1,23 @@
 import SwiftUI
 import AppKit
 
+enum PanelChrome {
+    /// A stretchable rounded-rect mask (the same trick NSPopover uses).
+    /// Shapes the behind-window blur itself — layer.cornerRadius alone
+    /// leaves the backdrop square, poking past the rounded corners.
+    static func roundedCornerMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
+    }
+}
+
 /// A frosted, popover-style panel anchored under a status-item button —
 /// the shared chrome for the tray, settings, and setup guide. Closes on
 /// any click outside it.
@@ -57,6 +74,9 @@ final class AnchoredPanel<Content: View> {
         effect.state = .active
         effect.blendingMode = .behindWindow
         effect.wantsLayer = true
+        // maskImage shapes the behind-window blur itself — layer.cornerRadius
+        // alone leaves the backdrop square, poking past the rounded corners.
+        effect.maskImage = PanelChrome.roundedCornerMask(radius: 16)
         effect.layer?.cornerRadius = 16
         effect.layer?.masksToBounds = true
         effect.layer?.borderWidth = 1
