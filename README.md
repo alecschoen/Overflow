@@ -77,10 +77,12 @@ era write-ups describe:
 - **Status items are hosted out-of-process by Control Centre.** Every
   status-item window (layer 25) is owned by the Control Centre process, so
   window ownership can no longer identify which app an item belongs to.
-- **Each item has one window copy per display**, and a display whose menu
-  bar auto-hides parks its entire row off-screen. Scans must be restricted
-  to a single display's menu-bar row (y-band filter) to avoid duplicates and
-  false "stashed" positives.
+- **Each item has one window copy per display *and per Space*** (extra
+  desktops and fullscreen apps multiply them, at identical coordinates), and
+  a display whose menu bar auto-hides parks its entire row off-screen. Scans
+  must be restricted to a single display's menu-bar row (y-band filter) and
+  then collapse overlapping frames — distinct items never overlap, per-Space
+  duplicates always do.
 - **Off-screen windows cannot be captured.** Both
   `SCScreenshotManager` (error -3811) and the legacy
   `CGWindowListCreateImage` (nil) refuse windows that are fully off-screen,
