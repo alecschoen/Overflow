@@ -115,10 +115,14 @@ private struct ItemCell: View {
     /// capture already includes the bar's own padding around the glyph.
     @ViewBuilder
     private var iconView: some View {
-        if let image = item.image {
-            Image(nsImage: image)
+        if let icon = item.icon {
+            // Template glyphs are re-tinted to the tray's own appearance so
+            // they stay readable whatever color the menu bar drew them in.
+            Image(nsImage: icon.image)
+                .renderingMode(icon.isTemplate ? .template : .original)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .foregroundStyle(.primary)
                 .frame(width: min(item.info.frame.width, 200), height: item.info.frame.height)
         } else if let fallback = item.fallback {
             Image(nsImage: fallback)

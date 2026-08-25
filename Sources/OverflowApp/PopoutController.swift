@@ -3,7 +3,7 @@ import SwiftUI
 
 struct PopoutItem: Identifiable {
     let info: MenuBarItemInfo
-    var image: NSImage?
+    var icon: CapturedIcon?
     var fallback: NSImage?
     var id: CGWindowID { info.windowID }
 }
@@ -25,7 +25,7 @@ final class PopoutController: ObservableObject {
     private var captureTask: Task<Void, Never>?
     private var flashInProgress = false
     private var lastAutoFlash: Date?
-    private var cachedImages: [CGWindowID: NSImage] = [:]
+    private var cachedImages: [CGWindowID: CapturedIcon] = [:]
     /// Top-right anchor of the panel in AppKit screen coordinates.
     private var anchor: NSPoint?
     /// CG bounds of the display whose menu bar we're showing icons from.
@@ -123,7 +123,7 @@ final class PopoutController: ObservableObject {
         items = hidden.map { info in
             PopoutItem(
                 info: info,
-                image: cachedImages[info.windowID],
+                icon: cachedImages[info.windowID],
                 fallback: info.hasUsefulOwner ? IconCapturer.fallbackIcon(for: info.pid) : nil
             )
         }
@@ -168,8 +168,8 @@ final class PopoutController: ObservableObject {
                 }
             }
             for index in self.items.indices {
-                if let image = self.cachedImages[self.items[index].id] {
-                    self.items[index].image = image
+                if let icon = self.cachedImages[self.items[index].id] {
+                    self.items[index].icon = icon
                 }
             }
             self.layoutPanel()
