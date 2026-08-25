@@ -198,8 +198,7 @@ final class PopoutController: ObservableObject {
         effect.state = .active
         effect.blendingMode = .behindWindow
         effect.wantsLayer = true
-        effect.maskImage = PanelChrome.roundedCornerMask(radius: 16)
-        effect.layer?.cornerRadius = 16
+        effect.layer?.cornerRadius = PanelChrome.cornerRadius
         effect.layer?.masksToBounds = true
         effect.layer?.borderWidth = 1
         effect.addSubview(hosting)
@@ -250,5 +249,6 @@ final class PopoutController: ObservableObject {
         }
         panel.setFrame(frame, display: true)
         hostingView.frame = panel.contentView?.bounds ?? .zero
+        (panel.contentView as? NSVisualEffectView)?.maskImage = PanelChrome.mask(size: frame.size)
     }
 }

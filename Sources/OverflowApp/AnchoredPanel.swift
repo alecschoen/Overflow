@@ -2,19 +2,19 @@ import SwiftUI
 import AppKit
 
 enum PanelChrome {
-    /// A stretchable rounded-rect mask (the same trick NSPopover uses).
-    /// Shapes the behind-window blur itself — layer.cornerRadius alone
-    /// leaves the backdrop square, poking past the rounded corners.
-    static func roundedCornerMask(radius: CGFloat) -> NSImage {
-        let edge = radius * 2 + 1
-        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+    static let cornerRadius: CGFloat = 16
+
+    /// A rounded-rect mask at the panel's exact size. Shapes the
+    /// behind-window blur itself — layer.cornerRadius alone leaves the
+    /// backdrop square, poking past the rounded corners. Regenerated on
+    /// every layout: a stretchable cap-inset mask leaves seam artifacts
+    /// ("spikes") at the middle of each edge on Retina displays.
+    static func mask(size: NSSize) -> NSImage {
+        NSImage(size: size, flipped: false) { rect in
             NSColor.black.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
             return true
         }
-        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
-        image.resizingMode = .stretch
-        return image
     }
 }
 
@@ -74,10 +74,7 @@ final class AnchoredPanel<Content: View> {
         effect.state = .active
         effect.blendingMode = .behindWindow
         effect.wantsLayer = true
-        // maskImage shapes the behind-window blur itself — layer.cornerRadius
-        // alone leaves the backdrop square, poking past the rounded corners.
-        effect.maskImage = PanelChrome.roundedCornerMask(radius: 16)
-        effect.layer?.cornerRadius = 16
+        effect.layer?.cornerRadius = PanelChrome.cornerRadius
         effect.layer?.masksToBounds = true
         effect.layer?.borderWidth = 1
         effect.addSubview(hosting)
@@ -124,5 +121,6 @@ final class AnchoredPanel<Content: View> {
         }
         panel.setFrame(frame, display: true)
         hostingView.frame = panel.contentView?.bounds ?? .zero
+        (panel.contentView as? NSVisualEffectView)?.maskImage = PanelChrome.mask(size: frame.size)
     }
 }
