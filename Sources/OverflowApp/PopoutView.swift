@@ -23,11 +23,15 @@ struct PopoutView: View {
             if controller.items.isEmpty {
                 emptyState
             } else {
+                // Uniform cells sized to the largest icon → a perfect grid,
+                // whatever mix of icon widths is stashed.
+                let cellWidth = controller.items.map { min($0.info.frame.width, 200) }.max() ?? 28
+                let cellHeight = controller.items.map(\.info.frame.height).max() ?? 24
                 VStack(alignment: .leading, spacing: CGFloat(iconSpacing)) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                         HStack(spacing: CGFloat(iconSpacing)) {
                             ForEach(row) { item in
-                                ItemCell(item: item) { rightClick in
+                                ItemCell(item: item, cellSize: CGSize(width: cellWidth, height: cellHeight)) { rightClick in
                                     controller.activate(item, rightClick: rightClick)
                                 }
                             }
@@ -97,12 +101,14 @@ struct PopoutView: View {
 
 private struct ItemCell: View {
     let item: PopoutItem
+    let cellSize: CGSize
     let action: (Bool) -> Void
     @State private var hovering = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         iconView
+            .frame(width: cellSize.width, height: cellSize.height)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(hovering ? Color.primary.opacity(0.14) : Color.clear)
