@@ -6,7 +6,7 @@ Stash the icons you rarely need behind a chevron. Click it and they appear
 in a popout tray under the menu bar — click one there and it works exactly
 as if it were still in the bar.
 
-![The Overflow tray open under the menu bar](screenshots/tray.png)
+![The Overflow tray — stashed icons in a frosted grid](screenshots/tray.png)
 
 ## Why
 
